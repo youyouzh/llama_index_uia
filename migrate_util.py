@@ -92,7 +92,7 @@ def replace_py_file(py_filepath: str, file_info: dict, import_mapping: dict[str,
         return []
 
     # 使用新的解析函数
-    imports = file_info['imports']
+    imports = file_info['imports'] or []
     changes = []
     # 重新读取文件行内容，准备修改
     with open(py_filepath, 'r', encoding='utf-8') as f:
@@ -126,6 +126,7 @@ def replace_py_file(py_filepath: str, file_info: dict, import_mapping: dict[str,
             changes.append(f"Line {imp['lineno']}: 'from {old_module}' -> 'from {new_module}'")
 
     # 处理字符串替换
+    str_mapping = str_mapping or {}
     for old_str, new_str in str_mapping.items():
         for index, line in enumerate(lines):
             if old_str in line:
@@ -147,7 +148,7 @@ def migrate_package_files(
         str_mapping: dict[str, str] = None,
         include_files: list[str] = None,
         exclude_files: list[str] = None,
-        clear_target=True,
+        clear_target=False,
         **kwargs
 ):
     """
@@ -235,7 +236,7 @@ def migrate_package_files(
     return True
 
 
-def extract_package_dependencies(package_root: str, include_prefixes=None, exclude_prefixes=None) -> list[str]:
+def extract_package_dependencies(package_root: str, include_prefixes=None, exclude_prefixes=None) -> dict[str, list[str]]:
     """
     扫描某个包下面所有文件import和from import依赖的包
     
@@ -244,7 +245,7 @@ def extract_package_dependencies(package_root: str, include_prefixes=None, exclu
         include_prefixes (list[str], optional): 包含前缀列表，只返回以这些前缀开头的模块依赖
         exclude_prefixes (list[str], optional): 排除前缀列表，排除以这些前缀开头的模块依赖
     Returns:
-        list[str]: 依赖的包列表（去重）
+        dict[str, list[str]]: 依赖的包对应文件
     Example:
         # 获取所有依赖
         dependencies = extract_package_dependencies('./my_package')
@@ -260,7 +261,7 @@ def extract_package_dependencies(package_root: str, include_prefixes=None, exclu
     if not os.path.isdir(package_root):
         raise ValueError(f"{package_root} is not a valid directory")
 
-    dependencies = set()
+    dependency_map = {}
     package_path = Path(package_root)
 
     # 遍历包目录中的所有Python文件
@@ -283,11 +284,13 @@ def extract_package_dependencies(package_root: str, include_prefixes=None, exclu
                 # 根据match_prefixes过滤模块
                 if include_prefixes and any(module_name.startswith(prefix) for prefix in include_prefixes):
                     # print(f"Found dependency: {module_name} in {py_file}")
-                    dependencies.add(module_name)
+                    if module_name not in dependency_map:
+                        dependency_map[module_name] = []
+                    dependency_map[module_name].append(py_file)
 
         except Exception as e:
             print(f"Warning: Error parsing {py_file}: {e}")
             continue
     # 转换为排序后的列表返回
-    return sorted(list(dependencies))
+    return dependency_map
 
