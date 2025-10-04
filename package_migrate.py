@@ -42,7 +42,11 @@ def migrate_instrumentation():
         ),
         target_package_dir=target_package_dir,
         exclude_files=['events/__init__.py'],
-        import_mapping=MIGRATE_IMPORT_MAPPING,
+        import_mapping={},
+        str_mapping={
+            'from llama_index_instrumentation import': 'from .. import',
+            'from llama_index_instrumentation.': 'from ..',
+        },
     )
 
 
@@ -96,6 +100,8 @@ def migrate_llm():
 def migrate_core(migrate_switch: bool = False):
     # 排除掉废弃和没什么用的模块
     exclude_modules = [
+        # 已经迁移的基础模块
+        'workflow', 'instrumentation',
         # 废弃的模块
         'command_line', 'text_splitter',
         # 不用的模块
@@ -191,12 +197,11 @@ def check_import_dependencies(check_modules: list[str] = None):
         print(f'Depend: {package}, file_count: {len(py_files)}, files: {py_files}')
 
 
-
 if __name__ == '__main__':
     shutil.rmtree(os.path.join(PACKAGE_ROOT, 'core'), ignore_errors=True)
     migrate_instrumentation()
     migrate_workflow()
     migrate_llm()
     migrate_tests()
-    # migrate_core(False)
-    migrate_core_simple(True)
+    migrate_core(True)
+    # migrate_core_simple(True)
