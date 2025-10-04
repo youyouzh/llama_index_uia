@@ -92,7 +92,7 @@ def replace_py_file(py_filepath: str, file_info: dict, import_mapping: dict[str,
         return []
 
     # 使用新的解析函数
-    imports = file_info['imports'] or []
+    imports = file_info.get('imports') or []
     changes = []
     # 重新读取文件行内容，准备修改
     with open(py_filepath, 'r', encoding='utf-8') as f:

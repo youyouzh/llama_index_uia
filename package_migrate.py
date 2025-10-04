@@ -93,24 +93,88 @@ def migrate_llm():
         )
 
 
-def migrate_core(exclude_modules: list[str] = None):
-    exclude_modules = exclude_modules or []
-    exclude_modules.extend(['instrumentation', 'workflow'])
-    exclude_modules.extend([
-        'readers/download.py',
-        'tools/download.py',
+def migrate_core(migrate_switch: bool = False):
+    # 排除掉废弃和没什么用的模块
+    exclude_modules = [
+        # 废弃的模块
+        'command_line', 'text_splitter',
+        # 不用的模块
+        'composability', 'sparse_embeddings', 'service_context_elements',
+        'playground', 'chat_ui', 'voice_agents', 'llama_pack',
         'langchain_helpers/text_splitter.py',
-    ])
+    ]
+    if migrate_switch:
+        migrate_package_files(
+            source_package_dir=os.path.join(
+                PARENT_PROJECT_PATH,
+                'llama_index',
+                r'llama-index-core\llama_index\core'
+            ),
+            target_package_dir=r'llama_index\core',
+            import_mapping=MIGRATE_IMPORT_MAPPING,
+            exclude_files=exclude_modules,
+            clear_target=False,
+        )
+
+    # 检查排除掉的模块是否存在依赖关系
+    base_modules = ['instrumentation', 'workflow']
+    dependency_map = extract_package_dependencies(
+        os.path.join(PACKAGE_ROOT, 'core'),
+        include_prefixes=[f'llama_index.core.{x}' for x in exclude_modules
+                          if x not in base_modules and not x.endswith('.py')],
+        exclude_prefixes=[f'llama_index.core.{x}' for x in base_modules],
+    )
+    for package, py_files in sorted(dependency_map.items(), key=lambda item: len(item[1])):
+        print(f'Depend: {package}, file_count: {len(py_files)}, files: {py_files}')
+
+
+def migrate_core_simple(migrate_switch: bool = False):
+    # 只迁移核心模块
+    include_modules = [
+        'agent', 'llms', 'memory', 'prompts', 'base', 'bridge', 'storage', 'tools', 'schema',
+        '__init__.py', 'constants.py', 'py.typed', 'settings.py', 'types.py', 'utils.py', 'async_utils.py',
+    ]
+    if migrate_switch:
+        migrate_package_files(
+            source_package_dir=os.path.join(
+                PARENT_PROJECT_PATH,
+                'llama_index',
+                r'llama-index-core\llama_index\core'
+            ),
+            target_package_dir=r'llama_index\core',
+            import_mapping=MIGRATE_IMPORT_MAPPING,
+            include_files=include_modules,
+        )
+
+    # 检查迁移后的是否还依赖剩余的模块
+    check_modules = ['instrumentation', 'workflow']
+    check_modules.extend(include_modules)
+    dependency_map = extract_package_dependencies(
+        os.path.join(PACKAGE_ROOT, 'core'),
+        include_prefixes=['llama_index'],
+        exclude_prefixes=[f'llama_index.core.{x}' for x in check_modules if not x.endswith('.py')],
+    )
+    py_file_depend_map = {}
+    for package, py_files in sorted(dependency_map.items(), key=lambda item: len(item[1])):
+        print(f'Depend: {package}, file_count: {len(py_files)}, files: {py_files}')
+        for py_file in py_files:
+            if py_file not in py_file_depend_map:
+                py_file_depend_map[py_file] = []
+            py_file_depend_map[py_file].append(package)
+    for py_file, depend_modules in sorted(py_file_depend_map.items(), key=lambda item: len(item[1])):
+        print(f'File: {py_file} depend count: {len(depend_modules)}: {depend_modules}')
+
+
+def migrate_tests():
     migrate_package_files(
         source_package_dir=os.path.join(
             PARENT_PROJECT_PATH,
             'llama_index',
-            r'llama-index-core\llama_index\core'
+            r'llama-index-core\tests\agent'
         ),
-        target_package_dir=r'llama_index\core',
+        target_package_dir=r'tests\agent',
         import_mapping=MIGRATE_IMPORT_MAPPING,
-        exclude_files=exclude_modules,
-        clear_target=False,
+        clear_target=True,
     )
 
 
@@ -127,18 +191,12 @@ def check_import_dependencies(check_modules: list[str] = None):
         print(f'Depend: {package}, file_count: {len(py_files)}, files: {py_files}')
 
 
+
 if __name__ == '__main__':
-    # shutil.rmtree(os.path.join(PACKAGE_ROOT, 'core'), ignore_errors=True)
-    # migrate_instrumentation()
-    # migrate_workflow()
-    # 不需要的模块
-    core_exclude_modules = [
-        # 废弃的模块
-        'command_line', 'text_splitter',
-        # 不用的模块
-        'composability', 'sparse_embeddings', 'service_context_elements',
-        'playground', 'chat_ui', 'voice_agents', 'llama_pack'
-    ]
-    # migrate_core(core_exclude_modules)
-    check_import_dependencies(core_exclude_modules)
-    # migrate_llm()
+    shutil.rmtree(os.path.join(PACKAGE_ROOT, 'core'), ignore_errors=True)
+    migrate_instrumentation()
+    migrate_workflow()
+    migrate_llm()
+    migrate_tests()
+    # migrate_core(False)
+    migrate_core_simple(True)
