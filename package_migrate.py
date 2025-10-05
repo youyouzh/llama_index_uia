@@ -82,17 +82,33 @@ def migrate_workflow():
     )
 
 
-def migrate_llm():
-    llm_dirs = [
+def migrate_sub_packages():
+    # 定义需要迁移的包目录
+    source_packages = [
+        # LLMs packages
         r'llama-index-integrations\llms\llama-index-llms-openai\llama_index\llms\openai',
         r'llama-index-integrations\llms\llama-index-llms-openai-like\llama_index\llms\openai_like',
         r'llama-index-integrations\llms\llama-index-llms-dashscope\llama_index\llms\dashscope',
+        # Tools packages
+        r'llama-index-integrations\tools\llama-index-tools-mcp\llama_index\tools\mcp',
+        # Utils packages
+        r'llama-index-utils\llama-index-utils-workflow\llama_index\utils\workflow',
+        # Memory packages
+        r'llama-index-integrations\memory\llama-index-memory-mem0\llama_index\memory\mem0',
     ]
-    for llm_dir in llm_dirs:
+
+    for source_dir in source_packages:
+        # 从路径中提取目标目录名称
+        # 例如从 r'llama-index-integrations\llms\llama-index-llms-openai\llama_index\llms\openai'
+        # 提取 'llms' 和 'openai'
+        path_parts = source_dir.split('\\')
+        target_parent_dir = path_parts[-2]  # 倒数第二个是父目录名 (如 'llms', 'tools' 等)
+        target_child_dir = path_parts[-1]   # 最后一个是子目录名 (如 'openai', 'mcp' 等)
+
         migrate_package_files(
-            source_package_dir=os.path.join(PARENT_PROJECT_PATH, 'llama_index', llm_dir),
+            source_package_dir=os.path.join(PARENT_PROJECT_PATH, 'llama_index', source_dir),
             import_mapping=MIGRATE_IMPORT_MAPPING,
-            target_package_dir=r'llama_index\llms\\' + llm_dir.split('\\')[-1],
+            target_package_dir=os.path.join('llama_index', target_parent_dir, target_child_dir),
             clear_target=True,
         )
 
@@ -201,7 +217,7 @@ if __name__ == '__main__':
     shutil.rmtree(os.path.join(PACKAGE_ROOT, 'core'), ignore_errors=True)
     migrate_instrumentation()
     migrate_workflow()
-    migrate_llm()
+    migrate_sub_packages()
     migrate_tests()
     migrate_core(True)
     # migrate_core_simple(True)
